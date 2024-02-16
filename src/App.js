@@ -4,10 +4,12 @@ import "@aws-amplify/ui-react/styles.css";
 
 //import { API } from "aws-amplify";
 import { generateClient } from 'aws-amplify/api';
-import { uploadData } from 'aws-amplify/storage';
-import {remove} from 'aws-amplify/storage';
-import {createTodo, updateTodo, deleteTodo } from './graphql/mutations';
-import {listTodos} from './graphql/queries';
+//import { uploadData, remove } from 'aws-amplify/storage';
+import { 
+  getUrl as myUrl,
+  uploadData,
+  remove as myRemove,
+} from 'aws-amplify/storage';
 
 import {
   Button,
@@ -26,7 +28,6 @@ import {
 } from "./graphql/mutations";
 
 const client = generateClient();
-const myStorage = uploadData();
 
 const App = ({ signOut }) => {
   const [notes, setNotes] = useState([]);
@@ -41,7 +42,7 @@ const App = ({ signOut }) => {
     await Promise.all(
       notesFromAPI.map(async (note) => {
         if (note.image){
-          const url = await myStorage.get(note.name);
+          const url = await myUrl(note.name);
           note.image = url;
         }
         return note;
@@ -59,7 +60,17 @@ const App = ({ signOut }) => {
       description: form.get("description"),
       image: image.name,
     };
-    if (!!data.image) await myStorage.put(data.name, image);
+    //if (!!data.image) await uploadData(data.name, image);
+    const uploadDataInBrowser = async (event) => {
+      if(event?.target?.files){
+        const file = event.target.files[0];
+        uploadData({
+          key: file.name,
+          data: file
+        });
+      }
+    };
+    uploadDataInBrowser(data.name, image);
     await client.graphql({
       query: createNoteMutation,
       variables: { input: data },
@@ -71,8 +82,8 @@ const App = ({ signOut }) => {
   async function deleteNote({ id, name }) {
     const newNotes = notes.filter((note) => note.id !== id);
     setNotes(newNotes);
-    await myStorage.remove(name);
-    await remove.graphql({
+    await myRemove(name);
+    await client.graphql({
       query: deleteNoteMutation,
       variables: { input: { id } },
     });
@@ -98,6 +109,12 @@ const App = ({ signOut }) => {
             labelHidden
             variation="quiet"
             required
+          />
+          <View
+            name="image"
+            as="input"
+            type="file"
+            style={{ alignSelf: "end" }}
           />
           <Button type="submit" variation="primary">
             Create Note
@@ -130,12 +147,6 @@ const App = ({ signOut }) => {
           </Flex>
         ))}
       </View>
-      <View
-        name="image"
-        as="input"
-        type="file"
-        style={{ alignSelf: "end" }}
-      />
       <Button onClick={signOut}>Sign Out</Button>
     </View>
   );
