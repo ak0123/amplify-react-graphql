@@ -3,7 +3,9 @@ import "./App.css";
 import "@aws-amplify/ui-react/styles.css";
 
 //import { API } from "aws-amplify";
-import { generateClient, Storage } from 'aws-amplify/api';
+import { generateClient } from 'aws-amplify/api';
+import { uploadData } from 'aws-amplify/storage';
+import {remove} from 'aws-amplify/storage';
 import {createTodo, updateTodo, deleteTodo } from './graphql/mutations';
 import {listTodos} from './graphql/queries';
 
@@ -24,6 +26,7 @@ import {
 } from "./graphql/mutations";
 
 const client = generateClient();
+const myStorage = uploadData();
 
 const App = ({ signOut }) => {
   const [notes, setNotes] = useState([]);
@@ -38,7 +41,7 @@ const App = ({ signOut }) => {
     await Promise.all(
       notesFromAPI.map(async (note) => {
         if (note.image){
-          const url = await Storage.get(note.name);
+          const url = await myStorage.get(note.name);
           note.image = url;
         }
         return note;
@@ -56,7 +59,7 @@ const App = ({ signOut }) => {
       description: form.get("description"),
       image: image.name,
     };
-    if (!!data.image) await Storage.put(data.name, image);
+    if (!!data.image) await myStorage.put(data.name, image);
     await client.graphql({
       query: createNoteMutation,
       variables: { input: data },
@@ -68,8 +71,8 @@ const App = ({ signOut }) => {
   async function deleteNote({ id, name }) {
     const newNotes = notes.filter((note) => note.id !== id);
     setNotes(newNotes);
-    await Storage.remove(name);
-    await client.graphql({
+    await myStorage.remove(name);
+    await remove.graphql({
       query: deleteNoteMutation,
       variables: { input: { id } },
     });
@@ -114,6 +117,13 @@ const App = ({ signOut }) => {
               {note.name}
             </Text>
             <Text as="span">{note.description}</Text>
+            {note.image && (
+              <Image
+                src={note.image}
+                alt={`visual aid for ${notes.name}`}
+                style={{ width: 400 }}
+              />
+            )}
             <Button variation="link" onClick={() => deleteNote(note)}>
               Delete note
             </Button>
@@ -131,28 +141,6 @@ const App = ({ signOut }) => {
   );
 };
 
-{notes.map((note) => (
-  <Flex
-    key={note.id || note.name}
-    direction="row"
-    justifyContent="center"
-    alignItems="center"
-  >
-    <Text as="strong" fontWeight={700}>
-      {note.name}
-    </Text>
-    <Text as="span">{note.description}</Text>
-    {note.image && (
-      <Image
-        src={note.image}
-        alt={`visual aid for ${notes.name}`}
-        style={{ width: 400 }}
-      />
-    )}
-    <Button variation="link" onClick={() => deleteNote(note)}>
-      Delete note
-    </Button>
-  </Flex>
-))}
+
 
 export default withAuthenticator(App);
